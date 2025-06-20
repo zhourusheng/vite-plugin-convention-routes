@@ -228,18 +228,20 @@ Object.keys(routeMap).forEach(routePath => {
     routes.push(route);
   }
 });
-
-`
+`;
 
         // 保存生成的路由代码，用于生成声明文件
         routesCode = routesImportCode
 
         // 在路由文件中注入自动生成的路由代码
         // 使用更精确的正则表达式，确保只替换声明部分，不影响后续代码
-        return code.replace(
-          /(const\s+routes\s*(?::\s*RouteRecordRaw\[\])?\s*=\s*)\[\s*\]/,
-          '$1' + routesImportCode.trim()
-        )
+        const routesRegex = /(const\s+routes\s*(?::\s*RouteRecordRaw\[\])?\s*=\s*)\[\s*\]/;
+        if (routesRegex.test(code)) {
+          return code.replace(routesRegex, (match, p1) => {
+            return p1 + routesImportCode.trim().replace(/;$/, '');
+          });
+        }
+        return null;
       }
       return null
     },
