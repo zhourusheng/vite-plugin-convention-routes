@@ -142,9 +142,9 @@ Object.keys(pages).forEach((path) => {
     .replace(/\\.vue$/, '');
     
   // 检查是否是布局组件
-  if (routePath.endsWith('/${layoutName}')) {
+  if (routePath.endsWith(\`/${layoutName}\`)) {
     // 获取布局组件所在的目录路径
-    const layoutDir = routePath.replace(new RegExp('/${layoutName}$'), '');
+    const layoutDir = routePath.replace(new RegExp(\`/${layoutName}$\`), '');
     layouts[layoutDir] = {
       component: ${isLazy ? 'pages[path]' : 'pages[path].default'},
       path: layoutDir
