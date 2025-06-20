@@ -102,7 +102,7 @@ export default function vitePluginConventionRoutes(
         // 生成路由代码
         const routesImportCode = `
 // 自动生成的路由配置
-const routes = [
+[
   {
     path: '/',
     component: ${isLazy 
