@@ -7,7 +7,8 @@ export default defineConfig({
     vue(),
     conventionRoutes({
       routesDir: 'src/views',
-      verbose: true
+      verbose: true,
+      excludes: ['components']
     }) as PluginOption
   ]
 })
