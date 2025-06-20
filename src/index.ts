@@ -96,6 +96,7 @@ Object.keys(pages).forEach((path) => {
     .replace(new RegExp(\`^/${routesDir}/\`), '')
     .replace(/\\.vue$/, '')
     .replace(/index$/, '')
+    // 支持多个动态路由参数
     .replace(/\\[(\\w+)\\]/g, ':$1')
     .replace(/\\/index$/, '')
     .replace(/\\//g, '/');
@@ -225,3 +226,4 @@ export default routes;
     }
   }
 }
+
