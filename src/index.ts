@@ -38,6 +38,12 @@ export interface RouteOptions {
    * @default true
    */
   isLazy?: boolean
+
+  /**
+   * 需要排除的目录
+   * @default ['components']
+   */
+  excludes?: string[]
 }
 
 /**
@@ -53,7 +59,8 @@ export default function vitePluginConventionRoutes(
     generateDeclaration = true,
     declarationPath = 'src/router/routes.d.ts',
     verbose = false,
-    isLazy = true
+    isLazy = true,
+    excludes = ['components']
   } = options
 
   let config: ResolvedConfig
@@ -70,6 +77,7 @@ export default function vitePluginConventionRoutes(
       if (verbose) {
         console.log('[vite-plugin-convention-routes] 项目根目录:', projectRoot)
         console.log('[vite-plugin-convention-routes] 路由目录:', routesDir)
+        console.log('[vite-plugin-convention-routes] 排除目录:', excludes)
       }
     },
 
@@ -113,6 +121,19 @@ Object.keys(pages).forEach((path) => {
     
   // 忽略已经处理的首页路由
   if (routePath === '') return;
+  
+  // 排除指定目录下的文件
+  const shouldExclude = ${JSON.stringify(excludes)}.some(excludeDir => 
+    path.includes(\`/${routesDir}/\${excludeDir}/\`) || 
+    path.startsWith(\`/${routesDir}/\${excludeDir}.\`)
+  );
+  
+  if (shouldExclude) {
+    if (${verbose}) {
+      console.log('[vite-plugin-convention-routes] 排除路由:', path);
+    }
+    return;
+  }
   
   // 创建路由对象
   const route = {
