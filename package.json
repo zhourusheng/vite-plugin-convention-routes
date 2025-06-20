@@ -1,7 +1,7 @@
 {
   "name": "vite-plugin-convention-routes",
-  "version": "0.2.0",
-  "description": "一个类似Umi的约定式路由Vite插件，自动根据文件结构生成路由配置，支持多级动态路由参数",
+  "version": "0.3.0",
+  "description": "一个类似Umi的约定式路由Vite插件，自动根据文件结构生成路由配置，支持多级动态路由参数、布局组件和懒加载",
   "type": "module",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -33,7 +33,9 @@
     "file-system-routes",
     "vue-router",
     "nested-routes",
-    "dynamic-routes"
+    "dynamic-routes",
+    "layout-routes",
+    "lazy-loading"
   ],
   "author": "",
   "license": "MIT",

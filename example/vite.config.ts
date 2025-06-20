@@ -8,7 +8,8 @@ export default defineConfig({
     conventionRoutes({
       routesDir: 'src/views',
       verbose: true,
-      excludes: ['components']
+      excludes: ['components'],
+      layoutName: '_layout'
     }) as PluginOption
   ]
 })
