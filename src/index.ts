@@ -237,7 +237,7 @@ Object.keys(routeMap).forEach(routePath => {
         // 使用更精确的正则表达式，确保只替换声明部分，不影响后续代码
         const routesRegex = /(const\s+routes\s*(?::\s*RouteRecordRaw\[\])?\s*=\s*)\[\s*\]/;
         if (routesRegex.test(code)) {
-          return code.replace(routesRegex, (match, p1) => {
+          return code.replace(routesRegex, (_match, p1) => {
             return p1 + routesImportCode.trim().replace(/;$/, '');
           });
         }
