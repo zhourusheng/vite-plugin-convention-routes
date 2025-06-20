@@ -44,6 +44,12 @@ export interface RouteOptions {
    * @default ['components']
    */
   excludes?: string[]
+
+  /**
+   * 布局文件名
+   * @default '_layout'
+   */
+  layoutName?: string
 }
 
 /**
@@ -60,7 +66,8 @@ export default function vitePluginConventionRoutes(
     declarationPath = 'src/router/routes.d.ts',
     verbose = false,
     isLazy = true,
-    excludes = ['components']
+    excludes = ['components'],
+    layoutName = '_layout'
   } = options
 
   let config: ResolvedConfig
@@ -78,6 +85,7 @@ export default function vitePluginConventionRoutes(
         console.log('[vite-plugin-convention-routes] 项目根目录:', projectRoot)
         console.log('[vite-plugin-convention-routes] 路由目录:', routesDir)
         console.log('[vite-plugin-convention-routes] 排除目录:', excludes)
+        console.log('[vite-plugin-convention-routes] 布局文件名:', layoutName)
       }
     },
 
@@ -108,20 +116,14 @@ const routes = [
 // 约定式路由导入
 const pages = import.meta.glob('/${routesDir}/**/*.vue', { ${isLazy ? '' : 'eager: true, '} });
 
-// 处理路由路径
+// 存储布局组件
+const layouts = {};
+
+// 存储路由路径与组件的映射
+const routeMap = {};
+
+// 第一步：收集所有路由和布局组件
 Object.keys(pages).forEach((path) => {
-  const routePath = path
-    .replace(new RegExp(\`^/${routesDir}/\`), '')
-    .replace(/\\.vue$/, '')
-    .replace(/index$/, '')
-    // 支持多个动态路由参数
-    .replace(/\\[(\\w+)\\]/g, ':$1')
-    .replace(/\\/index$/, '')
-    .replace(/\\//g, '/');
-    
-  // 忽略已经处理的首页路由
-  if (routePath === '') return;
-  
   // 排除指定目录下的文件
   const shouldExclude = ${JSON.stringify(excludes)}.some(excludeDir => 
     path.includes(\`/${routesDir}/\${excludeDir}/\`) || 
@@ -135,15 +137,96 @@ Object.keys(pages).forEach((path) => {
     return;
   }
   
-  // 创建路由对象
-  const route = {
-    path: routePath === '' ? '/' : \`/\${routePath}\`,
-    component: ${isLazy ? 'pages[path]' : 'pages[path].default'},
-    name: routePath.replace(/\\//g, '-') || 'home'
-  };
+  const routePath = path
+    .replace(new RegExp(\`^/${routesDir}/\`), '')
+    .replace(/\\.vue$/, '');
+    
+  // 检查是否是布局组件
+  if (routePath.endsWith('/${layoutName}')) {
+    // 获取布局组件所在的目录路径
+    const layoutDir = routePath.replace(new RegExp('/${layoutName}$'), '');
+    layouts[layoutDir] = {
+      component: ${isLazy ? 'pages[path]' : 'pages[path].default'},
+      path: layoutDir
+    };
+    
+    if (${verbose}) {
+      console.log('[vite-plugin-convention-routes] 检测到布局组件:', path, '目录:', layoutDir);
+    }
+    return;
+  }
   
-  // 添加到路由数组
-  routes.push(route);
+  // 处理普通路由
+  const processedPath = routePath
+    .replace(/index$/, '')
+    // 支持多个动态路由参数
+    .replace(/\\[(\\w+)\\]/g, ':$1')
+    .replace(/\\/index$/, '')
+    .replace(/\\//g, '/');
+    
+  // 忽略已经处理的首页路由
+  if (processedPath === '') return;
+  
+  // 存储路由信息
+  routeMap[processedPath] = {
+    path: processedPath === '' ? '/' : \`/\${processedPath}\`,
+    component: ${isLazy ? 'pages[path]' : 'pages[path].default'},
+    name: processedPath.replace(/\\//g, '-') || 'home'
+  };
+});
+
+// 第二步：处理布局组件和嵌套路由
+Object.keys(routeMap).forEach(routePath => {
+  const route = routeMap[routePath];
+  
+  // 检查路由是否应该嵌套在布局组件中
+  let parentFound = false;
+  
+  // 从最长的布局路径开始匹配，确保最深层的布局优先
+  Object.keys(layouts)
+    .sort((a, b) => b.length - a.length)
+    .forEach(layoutPath => {
+      // 如果路由路径以布局路径开头，并且不是布局路径本身
+      if (routePath.startsWith(layoutPath + '/') && !parentFound) {
+        parentFound = true;
+        
+        // 确保布局路由已添加到routes数组
+        let layoutRoute = routes.find(r => r.path === '/' + layoutPath);
+        
+        if (!layoutRoute) {
+          // 创建布局路由
+          layoutRoute = {
+            path: '/' + layoutPath,
+            component: layouts[layoutPath].component,
+            children: []
+          };
+          
+          // 添加到routes数组
+          routes.push(layoutRoute);
+          
+          if (${verbose}) {
+            console.log('[vite-plugin-convention-routes] 创建布局路由:', layoutRoute.path);
+          }
+        }
+        
+        // 将当前路由添加为布局路由的子路由
+        // 调整子路由的路径，移除父路由部分
+        const childPath = routePath.replace(layoutPath, '');
+        route.path = childPath || '/';
+        
+        if (${verbose}) {
+          console.log('[vite-plugin-convention-routes] 添加子路由:', route.path, '到布局:', layoutRoute.path);
+        }
+        
+        layoutRoute.children = layoutRoute.children || [];
+        layoutRoute.children.push(route);
+      }
+    });
+  
+  // 如果没有找到父布局，则添加到顶层路由
+  if (!parentFound) {
+    routes.push(route);
+  }
 });
 
 `
