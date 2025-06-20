@@ -32,6 +32,12 @@ export interface RouteOptions {
    * @default false
    */
   verbose?: boolean
+
+  /**
+   * 是否开启路由懒加载
+   * @default true
+   */
+  isLazy?: boolean
 }
 
 /**
@@ -46,7 +52,8 @@ export default function vitePluginConventionRoutes(
     extensions = ['.vue'],
     generateDeclaration = true,
     declarationPath = 'src/router/routes.d.ts',
-    verbose = false
+    verbose = false,
+    isLazy = true
   } = options
 
   let config: ResolvedConfig
@@ -82,13 +89,16 @@ export default function vitePluginConventionRoutes(
 const routes = [
   {
     path: '/',
-    component: () => import('/${routesDir}/index.vue'),
+    component: ${isLazy 
+      ? '() => import(\'/' + routesDir + '/index.vue\')' 
+      : 'import(\'/' + routesDir + '/index.vue\').default'
+    },
     children: []
   }
 ];
 
 // 约定式路由导入
-const pages = import.meta.glob('/${routesDir}/**/*.vue');
+const pages = import.meta.glob('/${routesDir}/**/*.vue', { ${isLazy ? '' : 'eager: true, '} });
 
 // 处理路由路径
 Object.keys(pages).forEach((path) => {
@@ -107,7 +117,7 @@ Object.keys(pages).forEach((path) => {
   // 创建路由对象
   const route = {
     path: routePath === '' ? '/' : \`/\${routePath}\`,
-    component: pages[path],
+    component: ${isLazy ? 'pages[path]' : 'pages[path].default'},
     name: routePath.replace(/\\//g, '-') || 'home'
   };
   
