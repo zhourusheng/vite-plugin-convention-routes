@@ -14,7 +14,7 @@
 
 <script setup lang="ts">
 // 导入Header组件
-import Header from './views/components/Header.vue'
+import Header from './src/views/components/Header.vue'
 </script>
 
 <style>
