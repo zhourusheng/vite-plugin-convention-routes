@@ -235,7 +235,11 @@ Object.keys(routeMap).forEach(routePath => {
         routesCode = routesImportCode
 
         // 在路由文件中注入自动生成的路由代码
-        return code.replace(/const\s+routes\s*=\s*\[\s*\]/, routesImportCode)
+        // 使用更精确的正则表达式，确保只替换声明部分，不影响后续代码
+        return code.replace(
+          /(const\s+routes\s*(?::\s*RouteRecordRaw\[\])?\s*=\s*)\[\s*\]/,
+          '$1' + routesImportCode.trim()
+        )
       }
       return null
     },
