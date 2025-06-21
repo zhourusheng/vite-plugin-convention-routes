@@ -1,5 +1,7 @@
 <template>
   <div class="users-page">
+    <h1>用户管理</h1>
+    <p>这是一个演示如何在组件中定义路由元数据的示例组件</p>
     <h2>用户列表</h2>
     <ul>
       <li v-for="user in users" :key="user.id">

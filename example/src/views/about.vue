@@ -1,24 +1,27 @@
 <template>
   <div class="about-page">
-    <h2>关于页面</h2>
-    <p>这是一个通过约定式路由自动生成的页面</p>
-    <p>文件路径: <code>src/views/about.vue</code></p>
-    <p>路由路径: <code>/about</code></p>
+    <h1>关于我们</h1>
+    <p>这是一个演示如何使用导出变量定义路由元数据的示例组件</p>
   </div>
 </template>
 
-<script setup lang="ts">
-// 关于页面组件
-</script>
-
-<style scoped>
-.about-page {
-  padding: 20px;
+<script>
+// 使用导出变量的方式定义路由元数据
+export const routeMeta = {
+  title: '关于我们页面',
+  icon: 'info-circle',
+  isPublic: true,
+  noCache: true
 }
 
-code {
-  background-color: #f0f0f0;
-  padding: 2px 4px;
-  border-radius: 4px;
+export default {
+  name: 'AboutPage'
+}
+</script>
+
+<style>
+.about-page {
+  padding: 20px;
+  background-color: #f5f5f5;
 }
 </style> 
