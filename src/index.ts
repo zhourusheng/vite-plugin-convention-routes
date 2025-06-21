@@ -50,6 +50,18 @@ export interface RouteOptions {
    * @default '_layout'
    */
   layoutName?: string
+  
+  /**
+   * 路由元数据配置文件路径
+   * @default 'src/router/route-meta.js'
+   */
+  metaConfigPath?: string
+
+  /**
+   * 是否启用组件内定义元数据
+   * @default true
+   */
+  enableInComponentMeta?: boolean
 }
 
 /**
@@ -67,13 +79,141 @@ export default function vitePluginConventionRoutes(
     verbose = false,
     isLazy = true,
     excludes = ['components'],
-    layoutName = '_layout'
+    layoutName = '_layout',
+    metaConfigPath = 'src/router/route-meta.js',
+    enableInComponentMeta = true
   } = options
 
   let config: ResolvedConfig
   let routesCode = ''
   let projectRoot = ''
   let needsUpdate = false
+  // 存储组件元数据的Map
+  const componentMeta = new Map<string, Record<string, any>>()
+  // 存储元数据配置
+  let metaConfig: Record<string, any> = {}
+
+  /**
+   * 从组件代码中提取元数据
+   */
+  function extractMetaFromComponent(code: string): Record<string, any> | null {
+    // 查找特定格式的注释块
+    const metaMatch = code.match(/\/\*\s*route-meta\s*({[^*]*})\s*\*\//)
+    if (metaMatch && metaMatch[1]) {
+      try {
+        // 解析JSON格式的元数据
+        return JSON.parse(metaMatch[1])
+      } catch (e) {
+        console.warn('[vite-plugin-convention-routes] 解析组件元数据JSON失败:', e)
+      }
+    }
+
+    // 查找导出的路由元数据对象
+    const exportMatch = code.match(/export\s+const\s+routeMeta\s*=\s*({[\s\S]*?});/)
+    if (exportMatch && exportMatch[1]) {
+      try {
+        // 提取对象字面量
+        const objectStr = exportMatch[1].trim()
+        
+        // 使用JSON.parse尝试解析，但首先需要将JS对象字面量转换为JSON格式
+        const jsonLike = objectStr
+          // 将属性名的单引号替换为双引号
+          .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":')
+          // 将字符串值的单引号替换为双引号
+          .replace(/:\s*'([^']*)'/g, ':"$1"')
+          // 处理布尔值和数字，确保它们不被引号包围
+          .replace(/:\s*true\b/g, ':true')
+          .replace(/:\s*false\b/g, ':false')
+          // 处理数组
+          .replace(/:\s*\[(.*?)\]/g, (_, p1) => {
+            // 如果数组内容是字符串，确保使用双引号
+            return ':' + JSON.stringify(
+              p1.split(',')
+                .map((item: string) => item.trim().replace(/^['"]|['"]$/g, ''))
+            )
+          })
+        
+        try {
+          return JSON.parse(jsonLike)
+        } catch (jsonError) {
+          console.warn('[vite-plugin-convention-routes] JSON解析失败，使用简单解析:', jsonError)
+          
+          // 回退到简单解析
+          const result: Record<string, any> = {}
+          const props = objectStr.match(/(\w+)\s*:\s*([^,}\r\n]+)/g) || []
+          
+          for (const prop of props) {
+            const [key, valueStr] = prop.split(':').map(p => p.trim())
+            
+            if (valueStr === 'true') {
+              result[key] = true
+            } else if (valueStr === 'false') {
+              result[key] = false
+            } else if (!isNaN(Number(valueStr))) {
+              result[key] = Number(valueStr)
+            } else if (valueStr.startsWith("'") && valueStr.endsWith("'")) {
+              result[key] = valueStr.slice(1, -1)
+            } else if (valueStr.startsWith('"') && valueStr.endsWith('"')) {
+              result[key] = valueStr.slice(1, -1)
+            } else {
+              result[key] = valueStr
+            }
+          }
+          
+          return result
+        }
+      } catch (e) {
+        console.warn('[vite-plugin-convention-routes] 解析导出的元数据对象失败:', e)
+      }
+    }
+
+    return null
+  }
+
+  // 应用元数据到路由对象
+  // @ts-ignore: 在模板字符串中使用，TypeScript无法检测
+  const applyMetadata = (route: any, fullPath: string): void => {
+    // 确保 meta 对象存在
+    route.meta = route.meta || {}
+    
+    // 1. 从元数据配置文件应用元数据
+    if (metaConfig && metaConfig[fullPath]) {
+      route.meta = {
+        ...route.meta,
+        ...metaConfig[fullPath]
+      }
+      
+      if (verbose) {
+        console.log('[vite-plugin-convention-routes] 从配置文件应用元数据:', fullPath);
+      }
+    }
+    
+    // 2. 如果是懒加载组件，尝试从组件应用元数据
+    if (route.component && typeof route.component === 'function') {
+      // 获取组件路径
+      const compStr = route.component.toString()
+      const importMatch = compStr.match(/import\(['"]([^'"]+)['"]\)/)
+      
+      if (importMatch && importMatch[1]) {
+        const componentPath = importMatch[1]
+        
+        // 在映射中查找相关元数据
+        for (const [id, meta] of componentMeta.entries()) {
+          if (id.includes(componentPath)) {
+            route.meta = {
+              ...route.meta,
+              ...meta
+            }
+            
+            if (verbose) {
+              console.log('[vite-plugin-convention-routes] 从组件应用元数据:', fullPath);
+            }
+            break
+          }
+        }
+      }
+    }
+  }
 
   return {
     name: 'vite-plugin-convention-routes',
@@ -88,9 +228,49 @@ export default function vitePluginConventionRoutes(
         console.log('[vite-plugin-convention-routes] 排除目录:', excludes)
         console.log('[vite-plugin-convention-routes] 布局文件名:', layoutName)
       }
+      
+      // 尝试加载元数据配置文件
+      try {
+        const metaConfigFile = path.resolve(projectRoot, metaConfigPath)
+        if (fs.existsSync(metaConfigFile)) {
+          try {
+            // 将路径转换为file:// URL格式
+            const fileUrl = new URL(`file://${metaConfigFile.replace(/\\/g, '/')}`)
+            
+            // 使用import()动态导入，而不是require
+            import(/* @vite-ignore */ fileUrl.href).then(module => {
+              metaConfig = module.default || module
+              
+              if (verbose) {
+                console.log('[vite-plugin-convention-routes] 加载元数据配置成功:', metaConfigFile)
+              }
+            }).catch(error => {
+              console.warn('[vite-plugin-convention-routes] 导入元数据配置文件失败:', error)
+            })
+          } catch (error) {
+            console.warn('[vite-plugin-convention-routes] 导入元数据配置文件失败:', error)
+          }
+        } else if (verbose) {
+          console.log('[vite-plugin-convention-routes] 元数据配置文件不存在:', metaConfigFile)
+        }
+      } catch (error) {
+        console.error('[vite-plugin-convention-routes] 加载元数据配置失败:', error)
+      }
     },
 
     transform(code, id) {
+      // 提取Vue组件中的元数据
+      if (enableInComponentMeta && id.endsWith('.vue') && id.includes(routesDir)) {
+        const meta = extractMetaFromComponent(code)
+        if (meta) {
+          // 存储提取到的元数据，后续在生成路由时使用
+          componentMeta.set(id, meta)
+          if (verbose) {
+            console.log('[vite-plugin-convention-routes] 从组件提取到元数据:', id, meta)
+          }
+        }
+      }
+
       // 只处理路由注册文件
       if (
         id.includes('router/index') &&
@@ -121,6 +301,21 @@ export default function vitePluginConventionRoutes(
   // 检测根目录是否有index.vue文件
   let hasRootIndex = false;
 
+  // 定义应用元数据的函数
+  const applyMetadata = (route, fullPath) => {
+    // 确保meta对象存在
+    route.meta = route.meta || {};
+    
+    // 应用元数据
+    const metaConfig = ${JSON.stringify(metaConfig)};
+    if (metaConfig && metaConfig[fullPath]) {
+      route.meta = {
+        ...route.meta,
+        ...metaConfig[fullPath]
+      };
+    }
+  };
+
   // 第一步：收集所有路由和布局组件
   Object.keys(pages).forEach((path) => {
     // 排除指定目录下的文件
@@ -148,6 +343,9 @@ export default function vitePluginConventionRoutes(
         component: ${isLazy ? 'pages[path]' : 'pages[path].default'},
         name: 'home'
       });
+      
+      // 应用元数据到根路由
+      applyMetadata(generatedRoutes[generatedRoutes.length - 1], '/');
       
       if (${verbose}) {
         console.log('[vite-plugin-convention-routes] 添加根路由: / 组件:', pages[path] ? '已加载' : '未加载');
@@ -231,6 +429,9 @@ export default function vitePluginConventionRoutes(
             // 添加到routes数组
             generatedRoutes.push(layoutRoute);
             
+            // 应用元数据
+            applyMetadata(layoutRoute, layoutRoute.path);
+            
             if (${verbose}) {
               console.log('[vite-plugin-convention-routes] 创建布局路由:', layoutRoute.path, '组件:', layouts[layoutPath].component ? '已加载' : '未加载');
             }
@@ -283,6 +484,10 @@ export default function vitePluginConventionRoutes(
             console.log('[vite-plugin-convention-routes] 添加子路由:', route.path, '到布局:', layoutRoute.path, '组件:', route.component ? '已加载' : '未加载');
           }
           
+          // 应用元数据
+          const fullPath = layoutRoute.path === '/' ? '/' + route.path : layoutRoute.path + '/' + route.path;
+          applyMetadata(route, fullPath);
+          
           // 最后检查确保路由有组件
           if (!route.component) {
             console.warn(\`[vite-plugin-convention-routes] 警告: 路由 \${route.path} 没有组件\`);
@@ -297,6 +502,9 @@ export default function vitePluginConventionRoutes(
       // 删除rawPath属性，避免Vue Router警告
       delete route.rawPath;
       generatedRoutes.push(route);
+      
+      // 应用元数据到路由
+      applyMetadata(route, route.path);
     }
   });
 

@@ -1,5 +1,7 @@
 <template>
   <div class="users-page">
+    <h1>用户管理</h1>
+    <p>这是一个演示如何在组件中定义路由元数据的示例组件</p>
     <h2>用户列表</h2>
     <ul>
       <li v-for="user in users" :key="user.id">
@@ -21,7 +23,7 @@ const users = ref([
 
 // 记录导航日志
 const logNavigation = (userId: string) => {
-  console.log(`导航到用户详情页: /users/${userId}`)
+  // 移除console.log
 }
 </script>
 
