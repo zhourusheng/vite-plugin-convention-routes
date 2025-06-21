@@ -103,6 +103,70 @@ src/views/
     └── Footer.vue              # 不会生成路由
 ```
 
+### 生成的路由配置示例
+
+以上文件结构将生成如下路由配置：
+
+```js
+[
+  {
+    "path": "/",
+    "component": "() => Component",
+    "name": "home"
+  },
+  {
+    "path": "/about",
+    "component": "() => Component",
+    "name": "about",
+    "originalFilePath": "/src/views/about.vue"
+  },
+  {
+    "path": "/exam",
+    "component": "() => Component",
+    "children": [
+      {
+        "path": ":courseId/:chapterId",
+        "component": "() => Component",
+        "name": "exam-courseId-chapterId",
+        "originalFilePath": "/src/views/exam/[courseId]/[chapterId]/index.vue"
+      },
+      {
+        "path": ":courseId",
+        "component": "() => Component",
+        "name": "exam-courseId",
+        "originalFilePath": "/src/views/exam/[courseId]/index.vue"
+      },
+      {
+        "path": "",
+        "component": "() => Component",
+        "name": "exam",
+        "originalFilePath": "/src/views/exam/index.vue"
+      }
+    ]
+  },
+  {
+    "path": "/users",
+    "component": "() => Component",
+    "children": [
+      {
+        "path": ":id",
+        "component": "() => Component",
+        "name": "users-id",
+        "originalFilePath": "/src/views/users/[id].vue"
+      },
+      {
+        "path": "",
+        "component": "() => Component",
+        "name": "users",
+        "originalFilePath": "/src/views/users/index.vue"
+      }
+    ]
+  }
+]
+```
+
+注意：实际生成的路由配置中，`"() => Component"` 是真实的组件引用函数，这里只是为了展示而简化。
+
 ## 布局组件
 
 布局组件是一种特殊的组件，用于为特定目录下的所有路由提供共享布局。布局组件命名为 `_layout.vue`，放置在需要应用布局的目录中。
