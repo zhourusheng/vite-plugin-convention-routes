@@ -1,4 +1,4 @@
-import type { Plugin, ResolvedConfig } from 'vite'
+import type { Plugin, ResolvedConfig, ModuleNode } from 'vite'
 import path from 'path'
 import fs from 'fs'
 
@@ -73,6 +73,7 @@ export default function vitePluginConventionRoutes(
   let config: ResolvedConfig
   let routesCode = ''
   let projectRoot = ''
+  let needsUpdate = false
 
   return {
     name: 'vite-plugin-convention-routes',
@@ -413,42 +414,152 @@ export default routes;
       return null
     },
 
-    // 监听路由文件变化，触发重新编译
+    // 监听路由文件变化，发送HMR更新而非重启服务器
     configureServer(server) {
       const routesGlob = `${routesDir}/**/*.vue`
+      let hmrTimeout: NodeJS.Timeout | null = null
 
+      // 监听路由目录中的Vue文件
       server.watcher.add(routesGlob)
-
-      server.watcher.on('add', file => {
-        if (
-          file.includes(routesDir) &&
-          extensions.some(ext => file.endsWith(ext))
-        ) {
+      
+      const handleRouteChange = (file: string) => {
+        if (file.includes(routesDir) && extensions.some(ext => file.endsWith(ext))) {
           if (verbose) {
-            console.log(
-              '[vite-plugin-convention-routes] 检测到新路由文件:',
-              file
-            )
+            console.log('[vite-plugin-convention-routes] 检测到路由文件变化:', file)
           }
-          // 触发重新编译
-          server.restart()
+          
+          // 标记需要更新，但不重启服务器
+          needsUpdate = true
+          
+          // 防抖处理，避免多个文件同时变化导致多次刷新
+          if (hmrTimeout) {
+            clearTimeout(hmrTimeout)
+          }
+          
+          hmrTimeout = setTimeout(() => {
+            // 找到所有可能需要更新的模块
+            const routerFiles = ['router/index.js', 'router/index.ts', 'src/router/index.js', 'src/router/index.ts']
+            const routerModules: ModuleNode[] = []
+            
+            // 收集所有路由相关模块
+            routerFiles.forEach(file => {
+              const mods = server.moduleGraph.getModulesByFile(file)
+              if (mods) {
+                routerModules.push(...Array.from(mods))
+              }
+            })
+            
+            // 获取虚拟模块
+            const virtualMods = server.moduleGraph.getModulesByFile('\0virtual:convention-routes')
+            if (virtualMods) {
+              routerModules.push(...Array.from(virtualMods))
+            }
+            
+            // 查找所有导入了路由模块的模块
+            const modulesToInvalidate = new Set<ModuleNode>(routerModules)
+            
+            // 递归查找所有引用了路由模块的模块
+            const addImporters = (mod: ModuleNode) => {
+              if (!mod.importers) return
+              for (const importer of mod.importers) {
+                if (!modulesToInvalidate.has(importer)) {
+                  modulesToInvalidate.add(importer)
+                  addImporters(importer)
+                }
+              }
+            }
+            
+            // 对所有路由模块应用递归查找
+            routerModules.forEach(mod => {
+              if (mod) {
+                addImporters(mod)
+              }
+            })
+            
+            if (verbose) {
+              console.log(`[vite-plugin-convention-routes] 找到 ${modulesToInvalidate.size} 个需要更新的模块`)
+            }
+            
+            // 如果找到了需要更新的模块
+            if (modulesToInvalidate.size > 0) {
+              // 使模块失效
+              modulesToInvalidate.forEach(mod => {
+                server.moduleGraph.invalidateModule(mod)
+              })
+              
+              // 发送HMR更新
+              const timestamp = Date.now()
+              const updates = Array.from(modulesToInvalidate).map(mod => ({
+                type: 'js-update' as const,
+                path: mod.url,
+                acceptedPath: mod.url,
+                timestamp
+              }))
+              
+              if (verbose) {
+                console.log('[vite-plugin-convention-routes] 发送HMR更新:', updates.length)
+              }
+              
+              // 尝试发送模块更新
+              server.ws.send({
+                type: 'update',
+                updates
+              })
+              
+              // 如果模块更新不成功，则进行全页面刷新
+              setTimeout(() => {
+                if (verbose) {
+                  console.log('[vite-plugin-convention-routes] 发送全页面刷新')
+                }
+                
+                server.ws.send({
+                  type: 'full-reload',
+                  path: '*'
+                })
+              }, 100)
+            } else {
+              // 没有找到相关模块，直接进行全页面刷新
+              if (verbose) {
+                console.log('[vite-plugin-convention-routes] 未找到相关模块，发送全页面刷新')
+              }
+              
+              server.ws.send({
+                type: 'full-reload',
+                path: '*'
+              })
+            }
+          }, 100) // 延迟100ms，等待多个文件变化合并为一次更新
         }
+      }
+
+      // 监听文件添加
+      server.watcher.on('add', file => {
+        handleRouteChange(file)
       })
 
+      // 监听文件删除
       server.watcher.on('unlink', file => {
-        if (
-          file.includes(routesDir) &&
-          extensions.some(ext => file.endsWith(ext))
-        ) {
+        handleRouteChange(file)
+      })
+      
+      // 监听文件更改
+      server.watcher.on('change', file => {
+        handleRouteChange(file)
+      })
+      
+      // 添加中间件，确保虚拟模块的变化也能触发热更新
+      server.middlewares.use((req, _res, next) => {
+        if (needsUpdate && req.url && (
+            req.url.includes('router/index') || 
+            req.url.includes('virtual:convention-routes')
+        )) {
+          needsUpdate = false
           if (verbose) {
-            console.log(
-              '[vite-plugin-convention-routes] 检测到路由文件删除:',
-              file
-            )
+            console.log('[vite-plugin-convention-routes] 检测到路由请求，触发更新')
           }
-          // 触发重新编译
-          server.restart()
+          handleRouteChange('virtual-trigger')
         }
+        next()
       })
     }
   }
