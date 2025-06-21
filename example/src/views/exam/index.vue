@@ -5,7 +5,7 @@
       <div v-for="course in courses" :key="course.id" class="course-card">
         <h3>{{ course.name }}</h3>
         <p>{{ course.description }}</p>
-        <router-link :to="`/exam/${course.id}`" class="view-btn" @click="logNavigation(course.id)">查看章节</router-link>
+        <router-link :to="`/exam/${course.id}`" class="view-btn" @click="navigateToCourse(course.id)">查看章节</router-link>
       </div>
     </div>
   </div>
@@ -13,6 +13,9 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 // 示例数据
 const courses = ref([
@@ -33,9 +36,9 @@ const courses = ref([
   }
 ])
 
-// 记录导航日志
-const logNavigation = (courseId: string) => {
-  console.log(`导航到课程章节列表: /exam/${courseId}`)
+// 导航到课程详情
+const navigateToCourse = (courseId: string) => {
+  router.push(`/exam/${courseId}`)
 }
 </script>
 

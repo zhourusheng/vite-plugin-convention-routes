@@ -23,7 +23,7 @@ const users = ref([
 
 // 记录导航日志
 const logNavigation = (userId: string) => {
-  console.log(`导航到用户详情页: /users/${userId}`)
+  // 移除console.log
 }
 </script>
 

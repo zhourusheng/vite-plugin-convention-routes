@@ -109,11 +109,59 @@ export default function vitePluginConventionRoutes(
     }
 
     // 查找导出的路由元数据对象
-    const exportMatch = code.match(/export\s+const\s+routeMeta\s*=\s*({[^;]*})/)
+    const exportMatch = code.match(/export\s+const\s+routeMeta\s*=\s*({[\s\S]*?});/)
     if (exportMatch && exportMatch[1]) {
       try {
-        // 使用Function构造器安全地求值对象字面量
-        return new Function(`return ${exportMatch[1]}`)()
+        // 提取对象字面量
+        const objectStr = exportMatch[1].trim()
+        
+        // 使用JSON.parse尝试解析，但首先需要将JS对象字面量转换为JSON格式
+        const jsonLike = objectStr
+          // 将属性名的单引号替换为双引号
+          .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?:/g, '"$2":')
+          // 将字符串值的单引号替换为双引号
+          .replace(/:\s*'([^']*)'/g, ':"$1"')
+          // 处理布尔值和数字，确保它们不被引号包围
+          .replace(/:\s*true\b/g, ':true')
+          .replace(/:\s*false\b/g, ':false')
+          // 处理数组
+          .replace(/:\s*\[(.*?)\]/g, (_, p1) => {
+            // 如果数组内容是字符串，确保使用双引号
+            return ':' + JSON.stringify(
+              p1.split(',')
+                .map((item: string) => item.trim().replace(/^['"]|['"]$/g, ''))
+            )
+          })
+        
+        try {
+          return JSON.parse(jsonLike)
+        } catch (jsonError) {
+          console.warn('[vite-plugin-convention-routes] JSON解析失败，使用简单解析:', jsonError)
+          
+          // 回退到简单解析
+          const result: Record<string, any> = {}
+          const props = objectStr.match(/(\w+)\s*:\s*([^,}\r\n]+)/g) || []
+          
+          for (const prop of props) {
+            const [key, valueStr] = prop.split(':').map(p => p.trim())
+            
+            if (valueStr === 'true') {
+              result[key] = true
+            } else if (valueStr === 'false') {
+              result[key] = false
+            } else if (!isNaN(Number(valueStr))) {
+              result[key] = Number(valueStr)
+            } else if (valueStr.startsWith("'") && valueStr.endsWith("'")) {
+              result[key] = valueStr.slice(1, -1)
+            } else if (valueStr.startsWith('"') && valueStr.endsWith('"')) {
+              result[key] = valueStr.slice(1, -1)
+            } else {
+              result[key] = valueStr
+            }
+          }
+          
+          return result
+        }
       } catch (e) {
         console.warn('[vite-plugin-convention-routes] 解析导出的元数据对象失败:', e)
       }
@@ -123,6 +171,7 @@ export default function vitePluginConventionRoutes(
   }
 
   // 应用元数据到路由对象
+  // @ts-ignore: 在模板字符串中使用，TypeScript无法检测
   const applyMetadata = (route: any, fullPath: string): void => {
     // 确保 meta 对象存在
     route.meta = route.meta || {}
@@ -185,13 +234,19 @@ export default function vitePluginConventionRoutes(
         const metaConfigFile = path.resolve(projectRoot, metaConfigPath)
         if (fs.existsSync(metaConfigFile)) {
           try {
-            // 动态导入可能会失败，所以我们使用 require
-            const module = require(metaConfigFile)
-            metaConfig = module.default || module
+            // 将路径转换为file:// URL格式
+            const fileUrl = new URL(`file://${metaConfigFile.replace(/\\/g, '/')}`)
             
-            if (verbose) {
-              console.log('[vite-plugin-convention-routes] 加载元数据配置成功:', metaConfigFile)
-            }
+            // 使用import()动态导入，而不是require
+            import(/* @vite-ignore */ fileUrl.href).then(module => {
+              metaConfig = module.default || module
+              
+              if (verbose) {
+                console.log('[vite-plugin-convention-routes] 加载元数据配置成功:', metaConfigFile)
+              }
+            }).catch(error => {
+              console.warn('[vite-plugin-convention-routes] 导入元数据配置文件失败:', error)
+            })
           } catch (error) {
             console.warn('[vite-plugin-convention-routes] 导入元数据配置文件失败:', error)
           }
@@ -245,6 +300,21 @@ export default function vitePluginConventionRoutes(
 
   // 检测根目录是否有index.vue文件
   let hasRootIndex = false;
+
+  // 定义应用元数据的函数
+  const applyMetadata = (route, fullPath) => {
+    // 确保meta对象存在
+    route.meta = route.meta || {};
+    
+    // 应用元数据
+    const metaConfig = ${JSON.stringify(metaConfig)};
+    if (metaConfig && metaConfig[fullPath]) {
+      route.meta = {
+        ...route.meta,
+        ...metaConfig[fullPath]
+      };
+    }
+  };
 
   // 第一步：收集所有路由和布局组件
   Object.keys(pages).forEach((path) => {

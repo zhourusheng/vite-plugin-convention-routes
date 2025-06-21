@@ -30,62 +30,42 @@ const courseId = computed(() => route.params.courseId as string)
 const chapterId = computed(() => route.params.chapterId as string)
 const courseTitle = ref('')
 const chapterTitle = ref('')
+const questions = ref([])
 
-// 加载课程和章节数据
-const loadCourseAndChapterData = () => {
-  // 重置数据
+// 加载考试数据的函数
+const loadExamData = (cId: string, chId: string) => {
+  // 重置数据，显示加载状态
   courseTitle.value = ''
   chapterTitle.value = ''
+  questions.value = []
   
-  // 获取当前路由参数
-  const cId = courseId.value
-  const chId = chapterId.value
-  
-  console.log('加载考试数据:', cId, chId) // 调试日志
-  
-  // 设置课程标题
-  if (cId === '1') {
-    courseTitle.value = '前端开发课程'
-    if (chId === '101') chapterTitle.value = 'HTML基础'
-    else if (chId === '102') chapterTitle.value = 'CSS进阶'
-    else if (chId === '103') chapterTitle.value = 'JavaScript核心'
-    else chapterTitle.value = '未知章节'
-  } 
-  else if (cId === '2') {
-    courseTitle.value = '后端开发课程'
-    if (chId === '201') chapterTitle.value = 'Node.js基础'
-    else if (chId === '202') chapterTitle.value = '数据库设计'
-    else if (chId === '203') chapterTitle.value = 'API开发'
-    else chapterTitle.value = '未知章节'
-  }
-  else if (cId === '3') {
-    courseTitle.value = '移动开发课程'
-    if (chId === '301') chapterTitle.value = 'React Native入门'
-    else if (chId === '302') chapterTitle.value = 'Flutter开发'
-    else if (chId === '303') chapterTitle.value = '混合应用开发'
-    else chapterTitle.value = '未知章节'
-  }
-  else {
-    courseTitle.value = '未知课程'
-    chapterTitle.value = '未知章节'
-  }
-  
-  console.log('考试数据已加载:', courseTitle.value, chapterTitle.value) // 调试日志
+  // 模拟API调用
+  setTimeout(() => {
+    // 假数据
+    courseTitle.value = cId === '1' ? 'JavaScript基础' : cId === '2' ? 'Vue.js进阶' : 'React入门'
+    chapterTitle.value = chId === '1' ? '变量与类型' : chId === '2' ? '函数与作用域' : '对象与原型'
+    
+    // 生成随机题目
+    questions.value = Array(5).fill(null).map((_, index) => ({
+      id: `q-${index + 1}`,
+      text: `问题 ${index + 1}: 关于${chapterTitle.value}的概念，下列说法正确的是？`,
+      options: ['选项A', '选项B', '选项C', '选项D']
+    }))
+  }, 500)
 }
 
 // 初始加载
 onMounted(() => {
-  loadCourseAndChapterData()
+  loadExamData(courseId.value, chapterId.value)
 })
 
-// 监听路由参数变化，使用深度监听确保捕获所有变化
+// 监听路由参数变化
 watch(
-  () => route.params,
-  () => {
-    console.log('路由参数变化:', courseId.value, chapterId.value) // 调试日志
-    loadCourseAndChapterData()
+  [courseId, chapterId],
+  ([newCourseId, newChapterId]) => {
+    loadExamData(newCourseId, newChapterId)
   },
-  { deep: true, immediate: true }
+  { immediate: true }
 )
 
 // 返回章节列表
