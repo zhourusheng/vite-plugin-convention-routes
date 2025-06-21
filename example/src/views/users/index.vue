@@ -3,7 +3,7 @@
     <h2>用户列表</h2>
     <ul>
       <li v-for="user in users" :key="user.id">
-        <router-link :to="`/users/${user.id}`">{{ user.name }}</router-link>
+        <router-link :to="`/users/${user.id}`" @click="logNavigation(user.id)">{{ user.name }}</router-link>
       </li>
     </ul>
   </div>
@@ -14,10 +14,15 @@ import { ref } from 'vue'
 
 // 模拟用户数据
 const users = ref([
-  { id: 1, name: '张三' },
-  { id: 2, name: '李四' },
-  { id: 3, name: '王五' }
+  { id: '1', name: '张三' },
+  { id: '2', name: '李四' },
+  { id: '3', name: '王五' }
 ])
+
+// 记录导航日志
+const logNavigation = (userId: string) => {
+  console.log(`导航到用户详情页: /users/${userId}`)
+}
 </script>
 
 <style scoped>

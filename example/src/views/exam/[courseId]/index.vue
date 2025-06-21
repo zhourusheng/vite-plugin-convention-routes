@@ -1,9 +1,9 @@
 <template>
-  <div class="chapter-list">
+  <div class="chapter-list" :key="route.path">
     <h2>《{{ courseTitle }}》章节列表</h2>
     <ul>
       <li v-for="chapter in chapters" :key="chapter.id">
-        <router-link :to="`/exam/${courseId}/${chapter.id}`">{{ chapter.title }}</router-link>
+        <router-link :to="`/exam/${courseId}/${chapter.id}`" @click="logNavigation(chapter.id)">{{ chapter.title }}</router-link>
       </li>
     </ul>
     <button @click="goBack">返回课程列表</button>
@@ -11,19 +11,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+
+interface Chapter {
+  id: string;
+  title: string;
+}
 
 const route = useRoute()
 const router = useRouter()
 const courseId = computed(() => route.params.courseId as string)
 const courseTitle = ref('')
-const chapters = ref([])
+const chapters = ref<Chapter[]>([])
 
-// 模拟获取课程章节数据
-onMounted(() => {
+// 加载课程章节数据
+const loadChapters = () => {
+  // 重置数据
+  courseTitle.value = ''
+  chapters.value = []
+  
   // 获取路由参数中的课程ID
   const id = courseId.value
+  
+  console.log('加载章节数据:', id) // 调试日志
 
   // 根据课程ID获取章节列表
   if (id === '1') {
@@ -48,7 +59,29 @@ onMounted(() => {
       { id: '303', title: '混合应用开发' }
     ]
   }
+  
+  console.log('章节数据已加载:', courseTitle.value, chapters.value.length) // 调试日志
+}
+
+// 初始加载
+onMounted(() => {
+  loadChapters()
 })
+
+// 监听路由参数变化，使用深度监听确保捕获所有变化
+watch(
+  () => route.params,
+  () => {
+    console.log('路由参数变化:', courseId.value) // 调试日志
+    loadChapters()
+  },
+  { deep: true, immediate: true }
+)
+
+// 记录导航日志
+const logNavigation = (chapterId: string) => {
+  console.log(`导航到章节详情页: /exam/${courseId.value}/${chapterId}`)
+}
 
 // 返回上一页
 const goBack = () => {

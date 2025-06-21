@@ -3,9 +3,10 @@
     <div class="layout-header">
       <h1>用户模块</h1>
       <nav class="layout-nav">
-        <router-link to="/users">用户列表</router-link>
-        <router-link to="/users/1">用户详情示例</router-link>
-        <router-link to="/users/2">另一个用户</router-link>
+        <router-link to="/users" exact-active-class="router-link-exact-active">用户列表</router-link>
+        <router-link :to="`/users/1`" :class="{ 'active-route': isActiveRoute('1') }">张三</router-link>
+        <router-link :to="`/users/2`" :class="{ 'active-route': isActiveRoute('2') }">李四</router-link>
+        <router-link :to="`/users/3`" :class="{ 'active-route': isActiveRoute('3') }">王五</router-link>
       </nav>
     </div>
     
@@ -17,7 +18,15 @@
 </template>
 
 <script setup lang="ts">
-// 用户模块的布局组件
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
+
+// 判断当前路由是否匹配指定的用户ID
+const isActiveRoute = (userId: string) => {
+  // 检查路由参数中的id是否匹配
+  return route.params.id === userId
+}
 </script>
 
 <style scoped>
@@ -56,7 +65,8 @@
 }
 
 .layout-nav a:hover,
-.layout-nav a.router-link-active {
+.layout-nav a.router-link-exact-active,
+.layout-nav a.active-route {
   background-color: #3498db;
   color: white;
 }

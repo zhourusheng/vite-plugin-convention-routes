@@ -5,7 +5,7 @@
       <div v-for="course in courses" :key="course.id" class="course-card">
         <h3>{{ course.name }}</h3>
         <p>{{ course.description }}</p>
-        <router-link :to="`/exam/${course.id}`" class="view-btn">查看章节</router-link>
+        <router-link :to="`/exam/${course.id}`" class="view-btn" @click="logNavigation(course.id)">查看章节</router-link>
       </div>
     </div>
   </div>
@@ -32,6 +32,11 @@ const courses = ref([
     description: '学习React Native和Flutter等技术，开发跨平台移动应用。' 
   }
 ])
+
+// 记录导航日志
+const logNavigation = (courseId: string) => {
+  console.log(`导航到课程章节列表: /exam/${courseId}`)
+}
 </script>
 
 <style scoped>

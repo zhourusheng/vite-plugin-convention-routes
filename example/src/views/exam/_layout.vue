@@ -3,9 +3,10 @@
     <div class="layout-header">
       <h1>考试系统</h1>
       <nav class="layout-nav">
-        <router-link to="/exam">课程列表</router-link>
-        <router-link to="/exam/math">数学课程</router-link>
-        <router-link to="/exam/english">英语课程</router-link>
+        <router-link to="/exam" exact-active-class="router-link-exact-active">课程列表</router-link>
+        <router-link :to="`/exam/1`" :class="{ 'active-route': isActiveRoute('1') }">前端</router-link>
+        <router-link :to="`/exam/2`" :class="{ 'active-route': isActiveRoute('2') }">后端</router-link>
+        <router-link :to="`/exam/3`" :class="{ 'active-route': isActiveRoute('3') }">移动端</router-link>
       </nav>
     </div>
     
@@ -21,7 +22,15 @@
 </template>
 
 <script setup lang="ts">
-// 考试模块的布局组件
+import { useRoute } from 'vue-router'
+
+const route = useRoute()
+
+// 判断当前路由是否匹配指定的课程ID
+const isActiveRoute = (courseId: string) => {
+  // 检查路由参数中的courseId是否匹配
+  return route.params.courseId === courseId
+}
 </script>
 
 <style scoped>
@@ -60,7 +69,8 @@
 }
 
 .layout-nav a:hover,
-.layout-nav a.router-link-active {
+.layout-nav a.router-link-exact-active,
+.layout-nav a.active-route {
   background-color: #e74c3c;
   color: white;
 }

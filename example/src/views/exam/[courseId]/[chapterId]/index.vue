@@ -1,5 +1,5 @@
 <template>
-  <div class="exam-detail">
+  <div class="exam-detail" :key="route.path">
     <h2>考试详情</h2>
     <div class="info">
       <p><strong>课程:</strong> {{ courseTitle }}</p>
@@ -15,13 +15,13 @@
       </div>
     </div>
     <div class="actions">
-      <button @click="goBack">返回章节列表</button>
+      <button @click="goBack">返回《{{ courseTitle }}》章节列表</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
@@ -31,11 +31,17 @@ const chapterId = computed(() => route.params.chapterId as string)
 const courseTitle = ref('')
 const chapterTitle = ref('')
 
-// 模拟获取课程和章节数据
-onMounted(() => {
-  // 根据路由参数获取课程和章节信息
+// 加载课程和章节数据
+const loadCourseAndChapterData = () => {
+  // 重置数据
+  courseTitle.value = ''
+  chapterTitle.value = ''
+  
+  // 获取当前路由参数
   const cId = courseId.value
   const chId = chapterId.value
+  
+  console.log('加载考试数据:', cId, chId) // 调试日志
   
   // 设置课程标题
   if (cId === '1') {
@@ -63,7 +69,24 @@ onMounted(() => {
     courseTitle.value = '未知课程'
     chapterTitle.value = '未知章节'
   }
+  
+  console.log('考试数据已加载:', courseTitle.value, chapterTitle.value) // 调试日志
+}
+
+// 初始加载
+onMounted(() => {
+  loadCourseAndChapterData()
 })
+
+// 监听路由参数变化，使用深度监听确保捕获所有变化
+watch(
+  () => route.params,
+  () => {
+    console.log('路由参数变化:', courseId.value, chapterId.value) // 调试日志
+    loadCourseAndChapterData()
+  },
+  { deep: true, immediate: true }
+)
 
 // 返回章节列表
 const goBack = () => {
